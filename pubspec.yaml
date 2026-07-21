@@ -1,6 +1,6 @@
 name: escpos_engine
 description: "Cross-platform ESC/POS receipt engine for Flutter (USB, Bluetooth, LAN; Android/iOS ready)."
-version: 0.0.2
+version: 0.0.3
 homepage: https://github.com/udayvasave/escpos_engine
 repository: https://github.com/udayvasave/escpos_engine
 

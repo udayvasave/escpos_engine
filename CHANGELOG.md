@@ -1,3 +1,11 @@
+## 0.0.3
+
+* Add `BleTransport` for BLE GATT printing (Windows WinRT + Android).
+* Windows: BLE scan, connect, and chunked GATT write (no COM port).
+* Android: classic Bluetooth RFCOMM/SPP via `BluetoothTransport`.
+* Android: BLE scan and GATT write via `BleTransport`.
+* Example app: separate Classic BT and BLE modes with platform-aware UI.
+
 ## 0.0.2
 
 * Implement `TcpTransport` for LAN raw TCP (default port 9100) via `dart:io` Socket.

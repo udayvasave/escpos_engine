@@ -12,6 +12,7 @@ class MockEscposEnginePlatform
     implements EscposEnginePlatform {
   final List<Map<String, Object?>> serialWrites = [];
   final List<Map<String, Object?>> usbWrites = [];
+  final List<Map<String, Object?>> bleWrites = [];
 
   @override
   Future<String?> getPlatformVersion() => Future.value('42');
@@ -42,6 +43,39 @@ class MockEscposEnginePlatform
       'baudRate': baudRate,
     });
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> scanBleDevices({
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    return [
+      {'address': 'AA:BB:CC:DD:EE:FF', 'name': 'BLE Printer', 'rssi': -55},
+    ];
+  }
+
+  @override
+  Future<void> writeBle(
+    String address,
+    Uint8List data, {
+    String? serviceUuid,
+    String? characteristicUuid,
+  }) async {
+    bleWrites.add({
+      'address': address,
+      'data': data,
+      'serviceUuid': serviceUuid,
+      'characteristicUuid': characteristicUuid,
+    });
+  }
+
+  @override
+  Future<bool> isBleReady(String address) async => true;
+
+  @override
+  Future<List<Map<String, dynamic>>> listBluetoothDevices() async => const [];
+
+  @override
+  Future<void> writeBluetooth(String address, Uint8List data) async {}
 }
 
 void main() {
@@ -79,6 +113,21 @@ void main() {
 
     await engine.printRaw('USB Printer', Uint8List.fromList([0x1B, 0x40]));
     expect(fake.usbWrites, hasLength(1));
+  });
+
+  test('BleTransport scans and writes over BLE', () async {
+    final fake = MockEscposEnginePlatform();
+    EscposEnginePlatform.instance = fake;
+    final transport = BleTransport();
+    final engine = EscposEngine(transport: transport);
+
+    final devices = await transport.scan();
+    expect(devices, hasLength(1));
+    expect(devices.first.address, 'AA:BB:CC:DD:EE:FF');
+
+    await engine.printRaw('AA:BB:CC:DD:EE:FF', Uint8List.fromList([0x1B, 0x40]));
+    expect(fake.bleWrites, hasLength(1));
+    expect(fake.bleWrites.first['address'], 'AA:BB:CC:DD:EE:FF');
   });
 
   test('TcpTransport lists known hosts and sends over TCP', () async {

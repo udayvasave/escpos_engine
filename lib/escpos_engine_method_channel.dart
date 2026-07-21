@@ -59,4 +59,61 @@ class MethodChannelEscposEngine extends EscposEnginePlatform {
       'baudRate': baudRate,
     });
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> scanBleDevices({
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final result = await methodChannel.invokeMethod<List<dynamic>>(
+      'scanBleDevices',
+      <String, dynamic>{'timeoutMs': timeout.inMilliseconds},
+    );
+    if (result == null) return const [];
+    return result
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> writeBle(
+    String address,
+    Uint8List data, {
+    String? serviceUuid,
+    String? characteristicUuid,
+  }) async {
+    await methodChannel.invokeMethod<void>('writeBle', <String, dynamic>{
+      'address': address,
+      'data': data,
+      if (serviceUuid != null) 'serviceUuid': serviceUuid,
+      if (characteristicUuid != null) 'characteristicUuid': characteristicUuid,
+    });
+  }
+
+  @override
+  Future<bool> isBleReady(String address) async {
+    final result = await methodChannel.invokeMethod<bool>(
+      'isBleReady',
+      <String, dynamic>{'address': address},
+    );
+    return result ?? false;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> listBluetoothDevices() async {
+    final result = await methodChannel.invokeMethod<List<dynamic>>(
+      'listBluetoothDevices',
+    );
+    if (result == null) return const [];
+    return result
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> writeBluetooth(String address, Uint8List data) async {
+    await methodChannel.invokeMethod<void>('writeBluetooth', <String, dynamic>{
+      'address': address,
+      'data': data,
+    });
+  }
 }

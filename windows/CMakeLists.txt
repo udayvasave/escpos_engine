@@ -20,6 +20,8 @@ set(PLUGIN_NAME "escpos_engine_plugin")
 list(APPEND PLUGIN_SOURCES
   "escpos_engine_plugin.cpp"
   "escpos_engine_plugin.h"
+  "ble_transport.cpp"
+  "ble_transport.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment
@@ -46,7 +48,13 @@ target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 # dependencies here.
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin winspool)
+target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin winspool windowsapp)
+
+# WinRT BLE uses C++ exceptions; the rest of the plugin disables them.
+set_source_files_properties(ble_transport.cpp PROPERTIES
+  COMPILE_DEFINITIONS "_HAS_EXCEPTIONS=1"
+  COMPILE_OPTIONS "/EHsc"
+)
 
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an
@@ -86,7 +94,11 @@ add_executable(${TEST_RUNNER}
 )
 apply_standard_settings(${TEST_RUNNER})
 target_include_directories(${TEST_RUNNER} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(${TEST_RUNNER} PRIVATE flutter_wrapper_plugin winspool)
+target_link_libraries(${TEST_RUNNER} PRIVATE flutter_wrapper_plugin winspool windowsapp)
+set_source_files_properties(ble_transport.cpp PROPERTIES
+  COMPILE_DEFINITIONS "_HAS_EXCEPTIONS=1"
+  COMPILE_OPTIONS "/EHsc"
+)
 target_link_libraries(${TEST_RUNNER} PRIVATE gtest_main gmock)
 # flutter_wrapper_plugin has link dependencies on the Flutter DLL.
 add_custom_command(TARGET ${TEST_RUNNER} POST_BUILD

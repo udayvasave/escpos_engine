@@ -6,19 +6,16 @@ Cross-platform ESC/POS receipt engine for Flutter.
 
 Encoding stays in Dart. Transports only send opaque bytes.
 
-## Package name
-
-`escpos_engine` is intentional: not locked to Windows. Same core can grow USB, Bluetooth, LAN, Android, and iOS.
-
 ## Status
 
-| Transport | Windows | Android / iOS |
-|-----------|---------|---------------|
-| USB (spooler RAW) | Done | Later |
-| Bluetooth (COM / SPP) | Done | Later |
-| LAN (TCP 9100) | Done (`dart:io` Socket) | Same Dart path later |
+| Transport | Windows | Android |
+|-----------|---------|---------|
+| USB (spooler RAW) | Done | — |
+| Classic Bluetooth (SPP / COM) | Done (COM port) | Done (RFCOMM) |
+| BLE (GATT write) | Done | Done |
+| LAN (TCP 9100) | Done | Done |
 
-## Install (path / git for now)
+## Install
 
 ```yaml
 dependencies:
@@ -26,54 +23,57 @@ dependencies:
     path: ../escpos_engine
 ```
 
-## Bluetooth (Windows)
+## BLE printing (recommended for BLE thermal printers)
 
-1. Pair the thermal printer in **Windows Settings → Bluetooth**.
-2. Note the virtual **COM port** (Device Manager → Ports), e.g. `COM3`.
-3. Run the example and select that COM port.
+No COM port. Scan, pick device by MAC address, print via GATT.
+
+```dart
+final transport = BleTransport();
+await transport.scan(timeout: Duration(seconds: 5));
+
+final engine = EscposEngine(transport: transport);
+await engine.print(
+  ReceiptBuilder(paperSize: PaperSize.mm58)
+      .centerText('BLE TEST', bold: true)
+      .feed(3)
+      .build(),
+  destination: 'AA:BB:CC:DD:EE:FF', // MAC from scan
+);
+```
+
+## Classic Bluetooth
+
+**Windows:** pair printer → appears as `COM3` → use [BluetoothTransport].
+
+**Android:** pair printer in Settings → use [BluetoothTransport] (RFCOMM/SPP).
 
 ```dart
 final engine = EscposEngine(
-  transport: BluetoothTransport(baudRate: 9600), // try 115200 if needed
+  transport: BluetoothTransport(baudRate: 9600), // baud: Windows only
 );
-
-final ports = await engine.listPrinters(); // COM ports
-await engine.print(
-  ReceiptBuilder(paperSize: PaperSize.mm58)
-      .centerText('BT TEST', bold: true)
-      .feed(3)
-      .build(),
-  destination: 'COM3',
-);
+final devices = await engine.listPrinters();
+await engine.print(receipt, destination: devices.first.destination);
 ```
 
 ## LAN (TCP 9100)
 
-Raw network printing — printer and PC on the same LAN. Destination is the printer IP/hostname. No auto-discovery; enter the IP in the example app (LAN tab).
-
 ```dart
-final engine = EscposEngine(
-  transport: TcpTransport(port: 9100),
-);
-
-final ready = await engine.isPrinterReady('192.168.1.50');
-await engine.print(
-  ReceiptBuilder(paperSize: PaperSize.mm58)
-      .centerText('LAN TEST', bold: true)
-      .feed(3)
-      .build(),
-  destination: '192.168.1.50',
-);
+final engine = EscposEngine(transport: TcpTransport(port: 9100));
+await engine.print(receipt, destination: '192.168.1.50');
 ```
 
-## USB (Windows)
+## Example app
 
-```dart
-final engine = EscposEngine(transport: UsbTransport());
-await engine.print(receipt, destination: 'POS58 Printer');
+```bash
+cd example
+flutter run -d windows   # BLE scan + Classic BT + LAN + USB
+flutter run              # Android: BLE + Classic BT + LAN
 ```
 
-## Platforms
+On Android, grant **Bluetooth** (and **Nearby devices** / scan) permissions when prompted.
 
-- **Windows**: USB + Bluetooth + LAN implemented
-- **Android / iOS**: plugin stubs present; native USB/BT not implemented yet (LAN can use the same `TcpTransport` later)
+## Notes
+
+- BLE auto-discovers common write characteristics (Nordic UART, FFF0/FFF1, or first writable char).
+- Optional UUID override: `BleTransport(serviceUuid: '...', characteristicUuid: '...')`.
+- iOS plugin shell exists; native BT/BLE not implemented yet.

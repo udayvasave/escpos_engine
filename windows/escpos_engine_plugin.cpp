@@ -1,5 +1,7 @@
 #include "escpos_engine_plugin.h"
 
+#include "ble_transport.h"
+
 #include <windows.h>
 #include <winspool.h>
 
@@ -387,6 +389,97 @@ void EscposEnginePlugin::HandleMethodCall(
     }
     result->Success(
         flutter::EncodableValue(IsPrinterReady(Utf8ToWide(*printer_name))));
+    return;
+  }
+
+  if (method == "scanBleDevices") {
+    int timeout_ms = 5000;
+    const auto *args =
+        std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (args != nullptr) {
+      const auto timeout_it = args->find(flutter::EncodableValue("timeoutMs"));
+      if (timeout_it != args->end()) {
+        if (const auto *t = std::get_if<int32_t>(&timeout_it->second)) {
+          timeout_ms = *t;
+        } else if (const auto *t64 = std::get_if<int64_t>(&timeout_it->second)) {
+          timeout_ms = static_cast<int>(*t64);
+        }
+      }
+    }
+    result->Success(flutter::EncodableValue(ScanBleDevices(timeout_ms)));
+    return;
+  }
+
+  if (method == "writeBle") {
+    const auto *args =
+        std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (args == nullptr) {
+      result->Error("invalid_args", "writeBle expects a map of arguments");
+      return;
+    }
+
+    const auto address_it = args->find(flutter::EncodableValue("address"));
+    const auto data_it = args->find(flutter::EncodableValue("data"));
+    if (address_it == args->end() || data_it == args->end()) {
+      result->Error("invalid_args", "writeBle requires address and data");
+      return;
+    }
+
+    const auto *address = std::get_if<std::string>(&address_it->second);
+    const auto *data = std::get_if<std::vector<uint8_t>>(&data_it->second);
+    if (address == nullptr || data == nullptr) {
+      result->Error("invalid_args",
+                    "address must be a string and data must be Uint8List");
+      return;
+    }
+    if (address->empty() || data->empty()) {
+      result->Error("invalid_args", "address/data must not be empty");
+      return;
+    }
+
+    std::string service_uuid;
+    std::string characteristic_uuid;
+    const auto service_it = args->find(flutter::EncodableValue("serviceUuid"));
+    if (service_it != args->end()) {
+      if (const auto *s = std::get_if<std::string>(&service_it->second)) {
+        service_uuid = *s;
+      }
+    }
+    const auto char_it =
+        args->find(flutter::EncodableValue("characteristicUuid"));
+    if (char_it != args->end()) {
+      if (const auto *c = std::get_if<std::string>(&char_it->second)) {
+        characteristic_uuid = *c;
+      }
+    }
+
+    if (!WriteBleBytes(*address, *data, service_uuid, characteristic_uuid)) {
+      result->Error("print_failed", "BLE GATT write failed");
+      return;
+    }
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "isBleReady") {
+    const auto *args =
+        std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (args == nullptr) {
+      result->Success(flutter::EncodableValue(false));
+      return;
+    }
+    const auto address_it = args->find(flutter::EncodableValue("address"));
+    if (address_it == args->end()) {
+      result->Success(flutter::EncodableValue(false));
+      return;
+    }
+    const auto *address = std::get_if<std::string>(&address_it->second);
+    if (address == nullptr || address->empty()) {
+      result->Success(flutter::EncodableValue(false));
+      return;
+    }
+    result->Success(
+        flutter::EncodableValue(IsBleDeviceReachable(*address)));
     return;
   }
 

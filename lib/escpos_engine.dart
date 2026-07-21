@@ -19,7 +19,7 @@ export 'src/image/image_converter.dart';
 export 'src/models/paper_size.dart';
 export 'src/models/printer_profile.dart';
 export 'src/platform/method_channel.dart'
-    show UsbTransport, BluetoothTransport, TcpTransport;
+    show UsbTransport, BluetoothTransport, BleTransport, TcpTransport;
 export 'src/printer/printer.dart';
 export 'src/printer/printer_info.dart';
 export 'src/receipt/receipt.dart';
@@ -33,7 +33,8 @@ export 'src/transport/transport.dart';
 /// Encode once with [ReceiptBuilder] / [EscPosEncoder], then send via a
 /// [Transport]:
 /// - [UsbTransport] — Windows spooler RAW (USB)
-/// - [BluetoothTransport] — Windows COM/serial (paired BT SPP printers)
+/// - [BluetoothTransport] — Classic BT / Windows COM serial (SPP)
+/// - [BleTransport] — BLE GATT write (no COM port)
 /// - [TcpTransport] — LAN raw TCP (port 9100)
 class EscposEngine {
   EscposEngine({

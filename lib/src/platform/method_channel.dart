@@ -36,8 +36,8 @@ class UsbTransport implements Transport {
 
 /// Bluetooth POS printers on Windows usually expose a virtual COM port (SPP).
 ///
-/// Pair the printer in Windows Settings first, then use the COM port name
-/// (e.g. `COM3`) as the destination for [send].
+/// On Android, uses paired classic Bluetooth (RFCOMM/SPP) devices instead.
+/// Pair the printer in system settings first.
 class BluetoothTransport implements Transport {
   BluetoothTransport({
     EscposEnginePlatform? platform,
@@ -46,24 +46,114 @@ class BluetoothTransport implements Transport {
 
   final EscposEnginePlatform _platform;
 
-  /// Serial baud rate. Many ESC/POS BT printers use 9600 or 115200.
+  /// Serial baud rate for Windows COM ports. Ignored on Android RFCOMM.
   final int baudRate;
 
   @override
   Future<List<PrinterInfo>> listPrinters() async {
+    try {
+      final devices = await _platform.listBluetoothDevices();
+      if (devices.isNotEmpty) {
+        return devices
+            .map(
+              (d) => PrinterInfo(
+                name: d['name']?.toString() ?? d['address']?.toString() ?? '',
+                address: d['address']?.toString(),
+              ),
+            )
+            .where((p) => p.destination.isNotEmpty)
+            .toList(growable: false);
+      }
+    } catch (_) {
+      // Fall through to Windows COM port listing.
+    }
+
     final ports = await _platform.listSerialPorts();
     return ports.map((name) => PrinterInfo(name: name)).toList(growable: false);
   }
 
   @override
-  Future<void> send(String portName, Uint8List data) {
-    return _platform.writeSerial(portName, data, baudRate: baudRate);
+  Future<void> send(String destination, Uint8List data) async {
+    if (_looksLikeMacAddress(destination)) {
+      await _platform.writeBluetooth(destination, data);
+      return;
+    }
+    return _platform.writeSerial(destination, data, baudRate: baudRate);
   }
 
   @override
-  Future<bool> isPrinterReady(String portName) async {
+  Future<bool> isPrinterReady(String destination) async {
+    if (_looksLikeMacAddress(destination)) {
+      final devices = await _platform.listBluetoothDevices();
+      return devices.any(
+        (d) =>
+            d['address']?.toString().toUpperCase() ==
+            destination.toUpperCase(),
+      );
+    }
     final ports = await _platform.listSerialPorts();
-    return ports.any((p) => p.toUpperCase() == portName.toUpperCase());
+    return ports.any((p) => p.toUpperCase() == destination.toUpperCase());
+  }
+
+  static bool _looksLikeMacAddress(String value) {
+    return RegExp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$').hasMatch(value);
+  }
+}
+
+/// BLE (Bluetooth Low Energy) transport for ESC/POS thermal printers.
+///
+/// Scan for devices, then send raw bytes to a GATT write characteristic.
+/// Auto-discovers common printer UUIDs (Nordic UART, FFF0/FFF1).
+class BleTransport implements Transport {
+  BleTransport({
+    EscposEnginePlatform? platform,
+    this.scanTimeout = const Duration(seconds: 5),
+    this.serviceUuid,
+    this.characteristicUuid,
+    List<PrinterInfo>? knownDevices,
+  })  : _platform = platform ?? EscposEnginePlatform.instance,
+        _knownDevices = List<PrinterInfo>.from(knownDevices ?? const []);
+
+  final EscposEnginePlatform _platform;
+  final Duration scanTimeout;
+  final String? serviceUuid;
+  final String? characteristicUuid;
+  final List<PrinterInfo> _knownDevices;
+
+  /// Scans for nearby BLE devices and updates the internal device list.
+  Future<List<PrinterInfo>> scan() async {
+    final found = await _platform.scanBleDevices(timeout: scanTimeout);
+    _knownDevices
+      ..clear()
+      ..addAll(
+        found.map(
+          (d) => PrinterInfo(
+            name: d['name']?.toString() ?? d['address']?.toString() ?? '',
+            address: d['address']?.toString(),
+          ),
+        ),
+      );
+    return listPrinters();
+  }
+
+  @override
+  Future<List<PrinterInfo>> listPrinters() async {
+    return List<PrinterInfo>.from(_knownDevices, growable: false);
+  }
+
+  @override
+  Future<void> send(String destination, Uint8List data) {
+    return _platform.writeBle(
+      destination,
+      data,
+      serviceUuid: serviceUuid,
+      characteristicUuid: characteristicUuid,
+    );
+  }
+
+  @override
+  Future<bool> isPrinterReady(String destination) {
+    return _platform.isBleReady(destination);
   }
 }
 

@@ -49,4 +49,40 @@ abstract class EscposEnginePlatform extends PlatformInterface {
   }) {
     throw UnimplementedError('writeSerial() has not been implemented.');
   }
+
+  /// Scans for BLE devices. Each map has `address`, `name`, and `rssi`.
+  Future<List<Map<String, dynamic>>> scanBleDevices({
+    Duration timeout = const Duration(seconds: 5),
+  }) {
+    throw UnimplementedError('scanBleDevices() has not been implemented.');
+  }
+
+  /// Writes raw bytes to a BLE GATT characteristic.
+  Future<void> writeBle(
+    String address,
+    Uint8List data, {
+    String? serviceUuid,
+    String? characteristicUuid,
+  }) {
+    throw UnimplementedError('writeBle() has not been implemented.');
+  }
+
+  /// Returns whether a BLE device at [address] responds to GATT.
+  Future<bool> isBleReady(String address) {
+    throw UnimplementedError('isBleReady() has not been implemented.');
+  }
+
+  /// Lists paired/bonded classic Bluetooth devices (Android).
+  /// On Windows this falls back to [listSerialPorts].
+  Future<List<Map<String, dynamic>>> listBluetoothDevices() {
+    throw UnimplementedError('listBluetoothDevices() has not been implemented.');
+  }
+
+  /// Writes raw bytes over classic Bluetooth RFCOMM/SPP (Android).
+  Future<void> writeBluetooth(
+    String address,
+    Uint8List data,
+  ) {
+    throw UnimplementedError('writeBluetooth() has not been implemented.');
+  }
 }
