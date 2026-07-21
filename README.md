@@ -16,7 +16,7 @@ Encoding stays in Dart. Transports only send opaque bytes.
 |-----------|---------|---------------|
 | USB (spooler RAW) | Done | Later |
 | Bluetooth (COM / SPP) | Done | Later |
-| LAN (TCP 9100) | Stub — after BT testing | Later |
+| LAN (TCP 9100) | Done (`dart:io` Socket) | Same Dart path later |
 
 ## Install (path / git for now)
 
@@ -26,7 +26,7 @@ dependencies:
     path: ../escpos_engine
 ```
 
-## Bluetooth (Windows) — test first
+## Bluetooth (Windows)
 
 1. Pair the thermal printer in **Windows Settings → Bluetooth**.
 2. Note the virtual **COM port** (Device Manager → Ports), e.g. `COM3`.
@@ -47,6 +47,25 @@ await engine.print(
 );
 ```
 
+## LAN (TCP 9100)
+
+Raw network printing — printer and PC on the same LAN. Destination is the printer IP/hostname. No auto-discovery; enter the IP in the example app (LAN tab).
+
+```dart
+final engine = EscposEngine(
+  transport: TcpTransport(port: 9100),
+);
+
+final ready = await engine.isPrinterReady('192.168.1.50');
+await engine.print(
+  ReceiptBuilder(paperSize: PaperSize.mm58)
+      .centerText('LAN TEST', bold: true)
+      .feed(3)
+      .build(),
+  destination: '192.168.1.50',
+);
+```
+
 ## USB (Windows)
 
 ```dart
@@ -54,11 +73,7 @@ final engine = EscposEngine(transport: UsbTransport());
 await engine.print(receipt, destination: 'POS58 Printer');
 ```
 
-## LAN
-
-`TcpTransport` is a stub until you ask to build it after Bluetooth testing.
-
 ## Platforms
 
-- **Windows**: USB + Bluetooth implemented
-- **Android / iOS**: plugin stubs present; native send not implemented yet
+- **Windows**: USB + Bluetooth + LAN implemented
+- **Android / iOS**: plugin stubs present; native USB/BT not implemented yet (LAN can use the same `TcpTransport` later)

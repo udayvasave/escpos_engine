@@ -1,6 +1,8 @@
-/// Platform-channel backed transports for Windows.
+/// Platform-channel backed transports for Windows, plus Dart TCP for LAN.
 library;
 
+import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:escpos_engine/escpos_engine_platform_interface.dart';
@@ -65,32 +67,69 @@ class BluetoothTransport implements Transport {
   }
 }
 
-/// LAN / network raw TCP transport (port 9100).
+/// LAN / network raw TCP transport (JetDirect-style port 9100).
 ///
-/// Not implemented yet — will be added after Bluetooth testing.
+/// Uses Dart [Socket] — no native plugin calls. Works on Windows (and any
+/// Flutter target with `dart:io`). Destination for [send] is a host name or IP
+/// (e.g. `192.168.1.50`). There is no auto-discovery; pass [knownHosts] or
+/// enter the IP in the app UI.
 class TcpTransport implements Transport {
-  TcpTransport({this.port = 9100});
+  TcpTransport({
+    this.port = 9100,
+    this.timeout = const Duration(seconds: 5),
+    List<String>? knownHosts,
+  }) : knownHosts = List<String>.from(knownHosts ?? const []);
 
+  /// TCP port. Almost all ESC/POS network printers use **9100**.
   final int port;
+
+  /// Connect / write timeout.
+  final Duration timeout;
+
+  /// Optional remembered hosts returned by [listPrinters].
+  final List<String> knownHosts;
 
   @override
   Future<List<PrinterInfo>> listPrinters() async {
-    throw UnsupportedError(
-      'TcpTransport (LAN) is not implemented yet. Use BluetoothTransport or UsbTransport.',
-    );
+    return knownHosts
+        .map((name) => PrinterInfo(name: name))
+        .toList(growable: false);
   }
 
   @override
   Future<void> send(String host, Uint8List data) async {
-    throw UnsupportedError(
-      'TcpTransport (LAN) is not implemented yet. Use BluetoothTransport or UsbTransport.',
-    );
+    final target = host.trim();
+    if (target.isEmpty) {
+      throw ArgumentError('host is required for TcpTransport.send');
+    }
+
+    Socket? socket;
+    try {
+      socket = await Socket.connect(target, port, timeout: timeout);
+      socket.add(data);
+      await socket.flush().timeout(timeout);
+    } on SocketException catch (e) {
+      throw StateError('LAN print failed ($target:$port): ${e.message}');
+    } on TimeoutException {
+      throw StateError('LAN print timed out ($target:$port)');
+    } finally {
+      socket?.destroy();
+    }
   }
 
   @override
   Future<bool> isPrinterReady(String host) async {
-    throw UnsupportedError(
-      'TcpTransport (LAN) is not implemented yet. Use BluetoothTransport or UsbTransport.',
-    );
+    final target = host.trim();
+    if (target.isEmpty) return false;
+
+    Socket? socket;
+    try {
+      socket = await Socket.connect(target, port, timeout: timeout);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      socket?.destroy();
+    }
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -80,12 +81,36 @@ void main() {
     expect(fake.usbWrites, hasLength(1));
   });
 
-  test('TcpTransport is not implemented yet', () async {
-    final engine = EscposEngine(transport: TcpTransport());
-    expect(
-      () => engine.listPrinters(),
-      throwsA(isA<UnsupportedError>()),
+  test('TcpTransport lists known hosts and sends over TCP', () async {
+    final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final received = <int>[];
+    final sub = server.listen((client) {
+      client.listen(
+        received.addAll,
+        onDone: client.destroy,
+      );
+    });
+
+    addTearDown(() async {
+      await sub.cancel();
+      await server.close();
+    });
+
+    final transport = TcpTransport(
+      port: server.port,
+      knownHosts: const ['127.0.0.1'],
+      timeout: const Duration(seconds: 2),
     );
+    final engine = EscposEngine(transport: transport);
+
+    final listed = await engine.listPrinters();
+    expect(listed.map((p) => p.name), ['127.0.0.1']);
+    expect(await engine.isPrinterReady('127.0.0.1'), isTrue);
+
+    await engine.printRaw('127.0.0.1', Uint8List.fromList([0x1B, 0x40]));
+
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(received, [0x1B, 0x40]);
   });
 
   test('asciiSafe transliterates currency', () {

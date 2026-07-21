@@ -34,7 +34,7 @@ export 'src/transport/transport.dart';
 /// [Transport]:
 /// - [UsbTransport] — Windows spooler RAW (USB)
 /// - [BluetoothTransport] — Windows COM/serial (paired BT SPP printers)
-/// - [TcpTransport] — LAN (not implemented yet)
+/// - [TcpTransport] — LAN raw TCP (port 9100)
 class EscposEngine {
   EscposEngine({
     String? destination,
